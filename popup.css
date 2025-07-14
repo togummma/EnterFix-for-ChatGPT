@@ -22,6 +22,17 @@ h1 {
   text-align: center;
   border-bottom: 2px solid #e2e8f0;
   padding-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* タイトルアイコンのスタイル */
+.title-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 /* 設定グループのスタイル */

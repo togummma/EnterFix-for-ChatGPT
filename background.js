@@ -6,8 +6,8 @@
 
 // デフォルト設定
 const DEFAULT_SETTINGS = {
-  sendAction: 'Alt+Enter',    // メッセージ送信のキー
-  newlineAction: 'Enter'      // 改行のキー
+  sendAction: 'Enter',        // メッセージ送信のキー
+  newlineAction: 'Shift+Enter' // 改行のキー
 };
 
 /**

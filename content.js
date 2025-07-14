@@ -5,8 +5,8 @@
 
 // デフォルト設定（popup.jsと同じ値を使用）
 const DEFAULT_SETTINGS = {
-  sendAction: 'Alt+Enter',    // メッセージ送信のキー
-  newlineAction: 'Enter'      // 改行のキー
+  sendAction: 'Enter',        // メッセージ送信のキー
+  newlineAction: 'Shift+Enter' // 改行のキー
 };
 
 // 現在の設定を保持するグローバル変数
@@ -18,7 +18,7 @@ let isProcessingFakeEvent = false;
 /**
  * キーイベントが指定されたアクションと一致するかチェックする関数
  * @param {KeyboardEvent} event - チェックするキーボードイベント
- * @param {string} action - チェックするアクション ('Enter', 'Shift+Enter', 'Alt+Enter')
+ * @param {string} action - チェックするアクション ('Enter', 'Shift+Enter', 'Alt+Enter', 'Ctrl+Enter')
  * @returns {boolean} - 一致する場合はtrue
  */
 function isKeyMatch(event, action) {
@@ -31,6 +31,8 @@ function isKeyMatch(event, action) {
       return event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey;
     case 'Alt+Enter':
       return event.altKey && !event.shiftKey && !event.ctrlKey && !event.metaKey;
+    case 'Ctrl+Enter':
+      return event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey;
     default:
       return false;
   }
@@ -68,6 +70,9 @@ function createFakeEvent(targetAction, target) {
     case 'Alt+Enter':
       eventOptions.altKey = true;
       break;
+    case 'Ctrl+Enter':
+      eventOptions.ctrlKey = true;
+      break;
     // 'Enter'の場合は何も追加しない（デフォルト状態）
   }
   
@@ -83,6 +88,9 @@ function removeExistingHandler(proseEditor) {
     proseEditor.removeEventListener('keydown', proseEditor.keySwapHandler, true);
     delete proseEditor.keySwapHandler;
   }
+  
+  // フラグもクリア
+  proseEditor.dataset.keySwapAttached = 'false';
 }
 
 /**
@@ -111,30 +119,40 @@ function attachKeyHandler(proseEditor) {
     // 現在押されたキーが「改行」の設定と一致するかチェック
     if (isKeyMatch(event, currentSettings.newlineAction)) {
       // 改行として処理したい場合
-      // ChatGPTのデフォルトはEnter=送信なので、改行にするためにShift+Enterに変換
-      targetAction = 'Shift+Enter';
-      shouldPreventDefault = true;
+      if (currentSettings.newlineAction === 'Shift+Enter') {
+        // Shift+Enterが改行に設定されている場合、ChatGPTのデフォルト動作なのでそのまま通す
+        return;
+      } else {
+        // それ以外が改行に設定されている場合は、Shift+Enterに変換
+        targetAction = 'Shift+Enter';
+        shouldPreventDefault = true;
+      }
     }
     
     // 現在押されたキーが「送信」の設定と一致するかチェック
     else if (isKeyMatch(event, currentSettings.sendAction)) {
       // 送信として処理したい場合
-      // 送信ボタンを直接クリックする方法を使用
-      shouldPreventDefault = true;
-      
-      // デフォルトの動作を阻止
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      
-      // 送信ボタンを探して直接クリック
-      const sendButton = document.querySelector('[data-testid="send-button"]') || 
-                        document.querySelector('button[aria-label="Send message"]') ||
-                        document.querySelector('.absolute.md\\:bottom-3 button');
-      
-      if (sendButton && !sendButton.disabled) {
-        sendButton.click();
+      if (currentSettings.sendAction === 'Enter') {
+        // Enterが送信に設定されている場合、ChatGPTのデフォルト動作なのでそのまま通す
+        return;
+      } else {
+        // それ以外が送信に設定されている場合は、送信ボタンをクリック
+        shouldPreventDefault = true;
+        
+        // デフォルトの動作を阻止
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        
+        // 送信ボタンを探して直接クリック
+        const sendButton = document.querySelector('[data-testid="send-button"]') || 
+                          document.querySelector('button[aria-label="Send message"]') ||
+                          document.querySelector('.absolute.md\\:bottom-3 button');
+        
+        if (sendButton && !sendButton.disabled) {
+          sendButton.click();
+        }
+        return; // 送信処理はここで完了
       }
-      return; // 送信処理はここで完了
     }
     
     // 改行の変換が必要な場合のみ処理を実行
@@ -188,12 +206,14 @@ async function loadSettings() {
  */
 function tryAttachHandler() {
   // ChatGPTの入力エリア（ProseMirrorクラスを持つ要素）を検索
-  const proseEditor = document.querySelector('.ProseMirror');
+  const proseEditors = document.querySelectorAll('.ProseMirror');
   
-  // エディタが見つかった場合のみ、キーハンドラーを取り付け
-  if (proseEditor && !proseEditor.dataset.keySwapAttached) {
-    attachKeyHandler(proseEditor);
-  }
+  proseEditors.forEach(proseEditor => {
+    // まだハンドラーが取り付けられていない場合のみ処理
+    if (!proseEditor.dataset.keySwapAttached || proseEditor.dataset.keySwapAttached === 'false') {
+      attachKeyHandler(proseEditor);
+    }
+  });
 }
 
 /**
@@ -204,18 +224,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // 設定を更新
     currentSettings = { ...message.settings };
     
-    // 既存のエディタを検索してハンドラーを再設定
-    const proseEditor = document.querySelector('.ProseMirror');
-    if (proseEditor) {
+    // 偽装イベント処理中フラグもリセット
+    isProcessingFakeEvent = false;
+    
+    // 全てのProseMirrorエディタを検索してハンドラーを再設定
+    const proseEditors = document.querySelectorAll('.ProseMirror');
+    proseEditors.forEach(proseEditor => {
       // 古いハンドラーを削除
       removeExistingHandler(proseEditor);
       
-      // フラグをクリア
-      proseEditor.dataset.keySwapAttached = 'false';
-      
       // 新しい設定でハンドラーを再設定
       attachKeyHandler(proseEditor);
-    }
+    });
     
     // レスポンスを即座に送信
     sendResponse({ success: true });

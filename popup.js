@@ -5,8 +5,8 @@
 
 // デフォルト設定
 const DEFAULT_SETTINGS = {
-  sendAction: 'Alt+Enter',    // メッセージ送信のキー
-  newlineAction: 'Enter'      // 改行のキー
+  sendAction: 'Enter',        // メッセージ送信のキー
+  newlineAction: 'Shift+Enter' // 改行のキー
 };
 
 // DOM要素の取得
@@ -44,16 +44,20 @@ async function saveSettings(settings) {
     });
     
     // 各ChatGPTタブに設定更新メッセージを送信
-    for (const tab of tabs) {
+    const messagePromises = tabs.map(async tab => {
       try {
-        await chrome.tabs.sendMessage(tab.id, {
+        return await chrome.tabs.sendMessage(tab.id, {
           type: 'SETTINGS_UPDATED',
           settings: settings
         });
       } catch (error) {
         // タブが応答しない場合はスキップ（ページが読み込み中など）
+        return null;
       }
-    }
+    });
+    
+    // 全てのタブへのメッセージ送信を並行して実行
+    await Promise.allSettled(messagePromises);
     
   } catch (error) {
     // エラーが発生してもサイレントに処理
@@ -71,7 +75,7 @@ function handleDuplicateKeys(changedSelect, newValue) {
   // 重複している場合は、もう一方のセレクトを変更前の値に入れ替え
   if (otherSelect.value === newValue) {
     // 利用可能なオプションから、現在選択されていない値を見つける
-    const availableOptions = ['Enter', 'Shift+Enter', 'Alt+Enter'];
+    const availableOptions = ['Enter', 'Shift+Enter', 'Alt+Enter', 'Ctrl+Enter'];
     const currentValues = [sendSelect.value, newlineSelect.value];
     const unusedOption = availableOptions.find(option => !currentValues.includes(option));
     
