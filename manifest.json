@@ -1,0 +1,25 @@
+{
+  "name": "ChatGPT KeySwap",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "description": "Change ChatGPT key behavior: Enter for newline, Alt+Enter to send.",
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*"   
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*"
+  ],
+
+  "action": {
+    "default_title": "ChatGPT KeySwap"
+  }
+}
