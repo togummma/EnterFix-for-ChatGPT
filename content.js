@@ -12,6 +12,9 @@ const DEFAULT_SETTINGS = {
 // 現在の設定を保持するグローバル変数
 let currentSettings = { ...DEFAULT_SETTINGS };
 
+// 偽装イベントの処理中フラグ
+let isProcessingFakeEvent = false;
+
 /**
  * キーイベントが指定されたアクションと一致するかチェックする関数
  * @param {KeyboardEvent} event - チェックするキーボードイベント
@@ -52,7 +55,9 @@ function createFakeEvent(targetAction, target) {
     altKey: false,
     ctrlKey: false,
     metaKey: false,
-    view: window
+    view: window,
+    // 偽装イベントであることを示すカスタムプロパティ
+    isFakeKeySwapEvent: true
   };
   
   // ターゲットアクションに応じて修飾キーを設定
@@ -95,54 +100,61 @@ function attachKeyHandler(proseEditor) {
     // Enterキー以外は処理しない
     if (event.key !== 'Enter') return;
     
+    // 偽装イベントの処理中の場合はスキップ
+    if (isProcessingFakeEvent) {
+      return;
+    }
+    
     let shouldPreventDefault = false;
     let targetAction = null;
     
     // 現在押されたキーが「改行」の設定と一致するかチェック
     if (isKeyMatch(event, currentSettings.newlineAction)) {
       // 改行として処理したい場合
-      if (currentSettings.newlineAction === 'Enter') {
-        // Enterが改行に設定されている場合、Shift+Enterに変換
-        targetAction = 'Shift+Enter';
-        shouldPreventDefault = true;
-      }
-      // 既にShift+EnterやAlt+Enterの場合は、そのまま通す（変換不要）
+      // ChatGPTのデフォルトはEnter=送信なので、改行にするためにShift+Enterに変換
+      targetAction = 'Shift+Enter';
+      shouldPreventDefault = true;
     }
     
     // 現在押されたキーが「送信」の設定と一致するかチェック
     else if (isKeyMatch(event, currentSettings.sendAction)) {
       // 送信として処理したい場合
-      if (currentSettings.sendAction !== 'Enter') {
-        // Enter以外が送信に設定されている場合、通常のEnterに変換
-        targetAction = 'Enter';
-        shouldPreventDefault = true;
+      // 送信ボタンを直接クリックする方法を使用
+      shouldPreventDefault = true;
+      
+      // デフォルトの動作を阻止
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      
+      // 送信ボタンを探して直接クリック
+      const sendButton = document.querySelector('[data-testid="send-button"]') || 
+                        document.querySelector('button[aria-label="Send message"]') ||
+                        document.querySelector('.absolute.md\\:bottom-3 button');
+      
+      if (sendButton && !sendButton.disabled) {
+        sendButton.click();
       }
-      // Enterが送信に設定されている場合は、そのまま通す（デフォルト動作）
+      return; // 送信処理はここで完了
     }
     
-    // 変換が必要な場合のみ処理を実行
+    // 改行の変換が必要な場合のみ処理を実行
     if (shouldPreventDefault && targetAction) {
       // デフォルトの動作を阻止
       event.preventDefault();
       event.stopImmediatePropagation();
       
-      // 送信ボタンを探して直接クリックする（より確実な方法）
-      if (targetAction === 'Enter') {
-        // 送信の場合：送信ボタンを探してクリック
-        const sendButton = document.querySelector('[data-testid="send-button"]') || 
-                          document.querySelector('button[aria-label="Send message"]') ||
-                          document.querySelector('.absolute.md\\:bottom-3 button');
-        
-        if (sendButton && !sendButton.disabled) {
-          sendButton.click();
-          return;
-        }
-      }
+      // 偽装イベント処理中フラグを設定
+      isProcessingFakeEvent = true;
       
-      // 送信ボタンが見つからない場合や改行の場合は偽装イベントを使用
+      // 偽装イベントを使用して改行を実現
       setTimeout(() => {
         const fakeEvent = createFakeEvent(targetAction, event.target);
         event.target.dispatchEvent(fakeEvent);
+        
+        // フラグをリセット
+        setTimeout(() => {
+          isProcessingFakeEvent = false;
+        }, 50);
       }, 10);
     }
   };
