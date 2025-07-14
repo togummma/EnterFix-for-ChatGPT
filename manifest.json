@@ -4,6 +4,10 @@
   "manifest_version": 3,
   "description": "Change ChatGPT key behavior: Enter for newline, Alt+Enter to send.",
 
+  "background": {
+    "service_worker": "background.js"
+  },
+
   "content_scripts": [
     {
       "matches": [
@@ -20,6 +24,11 @@
   ],
 
   "action": {
-    "default_title": "ChatGPT KeySwap"
-  }
+    "default_title": "ChatGPT KeySwap",
+    "default_popup": "popup.html"
+  },
+
+  "permissions": [
+    "storage"
+  ]
 }
