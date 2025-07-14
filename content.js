@@ -192,15 +192,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // 設定を更新
     currentSettings = { ...message.settings };
     
-    // 既存のハンドラーを削除して新しい設定で再設定
+    // 既存のエディタを検索してハンドラーを再設定
     const proseEditor = document.querySelector('.ProseMirror');
     if (proseEditor) {
-      // フラグをクリアしてハンドラーを再設定
+      // 古いハンドラーを削除
+      removeExistingHandler(proseEditor);
+      
+      // フラグをクリア
       proseEditor.dataset.keySwapAttached = 'false';
+      
+      // 新しい設定でハンドラーを再設定
       attachKeyHandler(proseEditor);
     }
     
+    // レスポンスを即座に送信
     sendResponse({ success: true });
+    return true; // 非同期レスポンスを使用することを明示
   }
 });
 

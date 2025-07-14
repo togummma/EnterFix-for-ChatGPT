@@ -35,6 +35,7 @@ async function loadSettings() {
  */
 async function saveSettings(settings) {
   try {
+    // 設定をストレージに保存
     await chrome.storage.sync.set(settings);
     
     // content scriptに設定変更を通知
@@ -54,8 +55,6 @@ async function saveSettings(settings) {
       }
     }
     
-    // 設定を保存
-    await saveSettings(newSettings);
   } catch (error) {
     // エラーが発生してもサイレントに処理
   }
